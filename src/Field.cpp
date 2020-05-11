@@ -8,26 +8,30 @@ using namespace genv;
 Field::Field(Application * parent, int x, int y, int sx, int sy, int cx_, int cy_,
              bool color, std::function<void(int, int)> onClick_):
             Widget(parent,x,y,sx,sy), cx(cx_), cy(cy_), isBlack(color), 
-            onClick(onClick_), pushed(false), highlight(false)
+            onClick(onClick_), pushed(false), highlight(false), arrow(false)
 {
 }
 
 void Field::Draw(){
-
-    if(isBlack) {
-        gout << color(0,0,0);    
+    int r, g, b;
+    float tint_factor = 0.3f;
+    if (arrow) {
+        r = 230;
+        g = b = 50;
+    }
+    else if (pushed || highlight) {
+        r = b = 80;
+        g = 20;
     }
     else {
-        gout << color(255,255,255);
+        r = g = b = 0;
+        tint_factor = 0.85f;
     }
-    if(pushed || highlight) {
-        int r = 80 + (255 - 80) * 0.3*!isBlack;
-        int g = 20 + (255 - 20) * 0.3*!isBlack;
-        int b = 80 + (255 - 80) * 0.3*!isBlack;
-        gout << color(r,g,b);    
-    }
+    r = r + (255 - r) * tint_factor*(!isBlack);
+    g = g + (255 - g) * tint_factor*(!isBlack);
+    b = b + (255 - b) * tint_factor*(!isBlack);
 
-    gout << move_to(x, y)<< box(wid, hei);    
+    gout << color(r, g, b) << move_to(x, y)<< box(wid, hei);    
 
 }
 

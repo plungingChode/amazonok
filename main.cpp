@@ -27,16 +27,24 @@ protected:
         END
     };
 
+    enum player_t
+    {
+        EMPTY = 0,
+        P1 = 1,
+        P2 = 2,
+        ARROW = 3
+    };
+
     SetNum *setBoardSize, *setAmazonNum;
     Button *playButton, *vsBotButton;
 
     vector<vector<int>> hatter = 
-    {{1, 0, 0, 0, 0, 0},
+    {{1, 1, 0, 0, 0, 0},
+     {1, 0, 0, 0, 0, 0},
      {0, 0, 0, 0, 0, 0},
      {0, 0, 0, 0, 0, 0},
-     {0, 0, 0, 0, 0, 0},
-     {0, 0, 0, 0, 0, 0},
-     {0, 0, 0, 0, 0, 2}};
+     {0, 0, 0, 0, 0, 2},
+     {0, 0, 0, 0, 2, 2}};
 
     vector<vector<Field *>> fields;
     vector<Amazon *> amazons;
@@ -47,58 +55,123 @@ protected:
 
     Amazon *activeAmazon = nullptr;
     int status = BEGIN;
-    bool currentTeam = true;
+    bool currentTeam = false;
 
 public:
     Amazons(int Wid, int Hei): Application(Wid, Hei){}
 
-    bool checkCanMove(Amazon *a)
+    bool inBounds(int x, int y)
     {
-        int x = a->coordX();
-        int y = a->coordY();
+        return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
+    }
 
-        return true;
+    bool isFree(int x, int y)
+    {
+        return hatter[x][y] == 0;
+    }
+
+    bool isHighlight(int x, int y)
+    {
+        return hatter[x][y] == -1;
+    }
+
+    void highlight(int x, int y)
+    {
+        hatter[x][y] = -1;
+        fields[x][y]->setHighlight(true);
+    }
+
+    void clearHighlight()
+    {
+        for (int x = 0; x < boardSize; x++) {
+            for (int y = 0; y < boardSize; y++) {
+                if (isHighlight(x, y)) {
+                    hatter[x][y] = 0;
+                }
+                fields[x][y]->setHighlight(false);
+            }
+        }
+    }
+
+    bool checkDirection(int x, int y, int dx, int dy)
+    {
+        bool hasFree = false;
+        x += dx;
+        y += dy;
+        while(inBounds(x, y) && isFree(x, y))
+        {
+            highlight(x, y);
+            hasFree = true;
+            x += dx;
+            y += dy;
+        }
+        return hasFree;
+    }
+
+    bool checkFree(int x, int y)
+    {
+        bool good = false;
+        good |= checkDirection(x, y,  1,  0);
+        good |= checkDirection(x, y, -1,  0);
+        good |= checkDirection(x, y,  0,  1);
+        good |= checkDirection(x, y,  0, -1);
+        good |= checkDirection(x, y,  1,  1);
+        good |= checkDirection(x, y,  1, -1);
+        good |= checkDirection(x, y, -1,  1);
+        good |= checkDirection(x, y, -1, -1);
+        return good;
     }
 
     void amazon_onClick(Amazon *a)
-    {
-        printf("[amazon katt ] %d, %d\n", a->coordX(), a->coordY());
+    {        
+        int x = a->coordX();
+        int y = a->coordY();
+        printf("[amazon katt ] %d, %d\n", x, y);
 
-        if (status == SELECT && a->team() == currentTeam /* && tud mozogni */)
-        {
+        bool sameTeam = a->team() == currentTeam;
+        bool canMove = sameTeam && checkFree(x, y);
+        if (status == SELECT && sameTeam && canMove) {
             a->setSelected(true);
 
             activeAmazon = a;
-            printf("[amazon kival] %d, %d\n", a->coordX(), a->coordY());
+            printf("[amazon kival] %d, %d\n", x, y);
 
             status = MOVE; // kijeloltek vkit --> mozoghat
             printf("[status valt ] SEL >> MOV\n");
+        } else if (!sameTeam) {
+            printf("[amazon katt ] masik csapat\n");
+        } else if (!canMove) {
+            printf("[amazon katt ] nem tud mozogni\n");
         }
     }
 
     void field_onClick(int x, int y)
     {
         printf("[mezore katt ] %d, %d\n", x, y);
-        if (status == SHOOT) // lojon, ha elerheto a mezo
+        if (status == SHOOT && isHighlight(x, y)) // lojon, ha elerheto a mezo
         {
-            // ide helyezunk egy lovest
-            hatter[x][y] = 3;
-            status = 0;
+            hatter[x][y] = ARROW;
+            status = SELECT;
             currentTeam = !currentTeam;
+            fields[x][y]->setArrow(true);
+            activeAmazon->setSelected(false);
+            activeAmazon = nullptr;
+            clearHighlight();
 
             // itt megnezni, h nyert-e valaki
         }
 
-        if (status == MOVE /* && tud ide mozogni */) {
+        if (status == MOVE && isHighlight(x, y)) {
                 int regi_x = activeAmazon->coordX();
                 int regi_y = activeAmazon->coordY();
 
                 hatter[regi_x][regi_y] = 0;
-                hatter[x][y] = 1 + !currentTeam; // v. 2, ha a masik jatekos
+                hatter[x][y] = 2 - currentTeam; 
                 activeAmazon->MoveTo(x*fieldSize+10, y*fieldSize+10, x, y);
                 printf("[amazon mozog] (%d, %d) >> (%d, %d)\n", regi_x, regi_y, x, y);
 
-                if (false /* tud innen loni*/) {
+                clearHighlight();
+                if (checkFree(x, y)) {
                     status = SHOOT; // most lehessen loni
                     printf("[status valt ] MOV >> SHT\n");
                 }
@@ -159,12 +232,12 @@ public:
             for (int y = 0; y < boardSize; y++) {
                 if(hatter[x][y] != 0)
                 {
-                    bool team = (hatter[x][y] == 1);
+                    bool isPlayer1 = (hatter[x][y] == P1);
                     int pos_x = x * fieldSize + 10;
                     int pos_y = y * fieldSize + 10;
                     int size = fieldSize - 20;
 
-                    Amazon *a = new Amazon(this, pos_x, pos_y, size, size, x, y, amazonCallback, team);
+                    Amazon *a = new Amazon(this, pos_x, pos_y, size, size, x, y, amazonCallback, isPlayer1);
                     amazons.push_back(a);
                 }
             }
