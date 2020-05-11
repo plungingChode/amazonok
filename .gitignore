@@ -1,0 +1,6 @@
+.vscode
+*.zip
+*.sh
+*.md
+*.out
+obj
