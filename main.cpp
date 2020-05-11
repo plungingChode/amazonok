@@ -18,67 +18,100 @@ using namespace genv;
 
 class Amazons : public Application{
 protected:
+    enum status_t
+    {
+        BEGIN,
+        SELECT,
+        MOVE,
+        SHOOT,
+        END
+    };
+
     SetNum *setBoardSize, *setAmazonNum;
     Button *playButton, *vsBotButton;
 
     vector<vector<int>> hatter = 
-    {{0, 0, 0, 0},
-     {0, 0, 1, 0},
-     {0, 0, 3, 3},
-     {0, 0, 3, 2}};
+    {{1, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 2}};
 
-    vector<Field *> fields;
+    vector<vector<Field *>> fields;
     vector<Amazon *> amazons;
-    /* vector<vector<Field *>> _Fields;
-    vector<Amazon *> _Amazons;
-    vector<Arrow *> _Arrows;  */
-    int state = 0;
     int boardSize = 0;
     int maxAmazons = 0;
-    bool moveAmazon = false;
-    bool shootAmazon = false;
-    bool teamMoves = false;
-    bool teamShoots = false;
     bool setup = true;
+    int fieldSize;
 
-    Amazon *kival = nullptr;
-    int allapot = 0;
-    bool egyik_jatekos = true;
+    Amazon *activeAmazon = nullptr;
+    int status = BEGIN;
+    bool currentTeam = true;
 
 public:
     Amazons(int Wid, int Hei): Application(Wid, Hei){}
 
-    void vkire_kattintottak(Amazon* a)
+    bool checkCanMove(Amazon *a)
     {
-        kival = a;
+        int x = a->coordX();
+        int y = a->coordY();
 
-        // ha tud mozogni:
-        allapot = 1; // kijeloltek vkit --> mozoghat
-
-        printf("%p\n", (void*)a);
+        return true;
     }
 
-    void field_kattintas(int x, int y)
+    void amazon_onClick(Amazon *a)
     {
-        if (allapot == 2) // lojon, ha elerheto a mezo
+        printf("[amazon katt ] %d, %d\n", a->coordX(), a->coordY());
+
+        if (status == SELECT && a->team() == currentTeam /* && tud mozogni */)
+        {
+            a->setSelected(true);
+
+            activeAmazon = a;
+            printf("[amazon kival] %d, %d\n", a->coordX(), a->coordY());
+
+            status = MOVE; // kijeloltek vkit --> mozoghat
+            printf("[status valt ] SEL >> MOV\n");
+        }
+    }
+
+    void field_onClick(int x, int y)
+    {
+        printf("[mezore katt ] %d, %d\n", x, y);
+        if (status == SHOOT) // lojon, ha elerheto a mezo
         {
             // ide helyezunk egy lovest
             hatter[x][y] = 3;
-            allapot = 0;
-            egyik_jatekos = !egyik_jatekos;
+            status = 0;
+            currentTeam = !currentTeam;
 
             // itt megnezni, h nyert-e valaki
         }
 
-        if (allapot == 1) // engedjen mozogni, ha elerheto a mezo
-        {
-            // 'kival' koordinatai alapjan megnezni, h tud-e >ide< mozogni
+        if (status == MOVE /* && tud ide mozogni */) {
+                int regi_x = activeAmazon->coordX();
+                int regi_y = activeAmazon->coordY();
 
-            //  ha igen
-            //  hatter[kival.x][kival.y] = 0;
-            //  kival->MoveTo(x, y);
-                hatter[x][y] = 1; // v. 2, ha a masik jatekos
-                allapot = 2; // most lehessen loni
+                hatter[regi_x][regi_y] = 0;
+                hatter[x][y] = 1 + !currentTeam; // v. 2, ha a masik jatekos
+                activeAmazon->MoveTo(x*fieldSize+10, y*fieldSize+10, x, y);
+                printf("[amazon mozog] (%d, %d) >> (%d, %d)\n", regi_x, regi_y, x, y);
+
+                if (false /* tud innen loni*/) {
+                    status = SHOOT; // most lehessen loni
+                    printf("[status valt ] MOV >> SHT\n");
+                }
+                else {
+                    status = SELECT;
+                    printf("[status valt ] MOV >> SEL\n");
+                    
+                    activeAmazon->setSelected(false);
+                    activeAmazon = nullptr;
+                    printf("[amazon kival] torolve\n");
+
+                    currentTeam = !currentTeam;
+                }
         }
     }
 
@@ -87,9 +120,9 @@ public:
         setAmazonNum = new SetNum(this, 250, 340, 100, 30, 1, 4);
         function<void()> play = [=](){
             widgets.clear();
-            state = 1;
+            status = SELECT;
             boardSize = setBoardSize->GetValue();
-            StateCheck();
+            Setup();
         };
         playButton = new Button(this, 250, 150, 100, 30, "Play", play);
         /* vsBotButton = new Button(this, 250, 190, 100, 30, "VS Bot"); */
@@ -97,63 +130,45 @@ public:
 
 
     void Setup(){
-        double calculate = wid/boardSize, fieldSize;
+        double calculate = wid/boardSize;
         fieldSize = floor(calculate);
 
-        function<void(int, int)> checkPosition = [=](int cx, int cy){
-            for(Field * f : fields){
-                f->ColorThis(cx, cy);
-                setup = false;
-            }
-            moveAmazon = true;
+        fields = vector<vector<Field *>>(boardSize, vector<Field*>(boardSize));
+        std::function<void(int, int)> fieldCallback = [=](int x, int y)
+        {
+            field_onClick(x, y);
         };
+        for(int x = 0;x<boardSize;x++){
+            for(int y = 0;y<boardSize;y++){
+                int pos_x = x*fieldSize;
+                int pos_y = y*fieldSize;
+                int size = fieldSize;
+                bool isBlack = (x+y)%2;
 
-        // if(maxAmazons < setAmazonNum->GetValue()*2){setup = true;}
-
-        // function<void(int, int)> newAmazon = [=](int cx, int cy){
-        //     if(maxAmazons == setAmazonNum->GetValue()*2){setup = false;}
-        //     if(maxAmazons < setAmazonNum->GetValue()*2){setup = true;}
-            
-        //     if((maxAmazons < setAmazonNum->GetValue()*2) && setup){
-        //         Amazon *amazon = new Amazon(this, cx, cy, fieldSize, fieldSize, checkPosition, teamMoves);
-        //         amazons.push_back(amazon);
-        //         teamMoves = !teamMoves;
-        //         maxAmazons +=1;
-        //     }
-            
-        //     if(moveAmazon && !setup){  
-        //         for(Amazon * a : amazons){
-        //             if(a->WantsToMove() && a->WhichTeam() == teamMoves){
-        //                 a->MoveTo(cx,cy);
-        //                 teamMoves = !teamMoves;
-        //                 shootAmazon = true;
-        //                 break;
-        //             }
-        //         }
-        //         moveAmazon = false;
-        //     }
-            
-        //     if(shootAmazon && !setup){  
-        //         for(Amazon * a : amazons){
-        //             if(a->WantsToShoot() && a->WhichTeam() == teamShoots){
-        //                 a->ShootTo(cx,cy);
-        //                 teamMoves = !teamMoves;
-        //                 shootAmazon = false;
-        //                 break;
-        //             }
-        //         }
-        //     }
-        // };
-
-        for(int i = 0;i<boardSize;i++){
-            for(int j = 0;j<boardSize;j++){
-                Field *F = new Field(this, i*fieldSize, j*fieldSize, fieldSize, fieldSize, (i+j)%2, [=](int x, int y) { field_kattintas(x, y); });
-                fields.push_back(F);
+                Field *f = new Field (this, pos_x, pos_y, size, size, x, y, isBlack, fieldCallback);
+                fields[x][y] = f;
             }
         }
 
-        Amazon *amazon = new Amazon(this, 1, 1, fieldSize, fieldSize, [=](Amazon* a) { vkire_kattintottak(a); }, teamMoves);
-        amazons.push_back(amazon);
+        std::function<void(Amazon*)> amazonCallback = [=](Amazon* a)
+        {
+            amazon_onClick(a);
+        };
+
+        for (int x = 0; x < boardSize; x++) {
+            for (int y = 0; y < boardSize; y++) {
+                if(hatter[x][y] != 0)
+                {
+                    bool team = (hatter[x][y] == 1);
+                    int pos_x = x * fieldSize + 10;
+                    int pos_y = y * fieldSize + 10;
+                    int size = fieldSize - 20;
+
+                    Amazon *a = new Amazon(this, pos_x, pos_y, size, size, x, y, amazonCallback, team);
+                    amazons.push_back(a);
+                }
+            }
+        }
     }
 
     void Play(){}
@@ -164,7 +179,7 @@ public:
     }
 
     void StateCheck(){
-        switch (state)
+        switch (status)
         {
         case 0:
             Menu();
