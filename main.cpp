@@ -55,7 +55,7 @@ protected:
 
     Amazon *activeAmazon = nullptr;
     int status = BEGIN;
-    bool currentTeam = false;
+    bool currentTeam = true;
 
 public:
     Amazons(int Wid, int Hei): Application(Wid, Hei){}
@@ -140,20 +140,22 @@ public:
         int y = a->coordY();
         printf("[amazon katt ] %d, %d\n", x, y);
 
-        bool sameTeam = a->team() == currentTeam;
-        bool canMove = sameTeam && checkFree(x, y);
-        if (status == SELECT && sameTeam && canMove) {
-            a->setSelected(true);
+        if (status == SELECT) {
+            bool sameTeam = a->team() == currentTeam;
+            bool canMove = sameTeam && checkFree(x, y);
+            if (canMove) {
+                a->setSelected(true);
 
-            activeAmazon = a;
-            printf("[amazon kival] %d, %d\n", x, y);
+                activeAmazon = a;
+                printf("[amazon kival] %d, %d\n", x, y);
 
-            status = MOVE; // kijeloltek vkit --> mozoghat
-            printf("[status valt ] SEL >> MOV\n");
-        } else if (!sameTeam) {
-            printf("[amazon katt ] masik csapat\n");
-        } else if (!canMove) {
-            printf("[amazon katt ] nem tud mozogni\n");
+                status = MOVE; // kijeloltek vkit --> mozoghat
+                printf("[status valt ] SEL >> MOV\n");
+            } else if (!sameTeam) {
+                printf("[amazon katt ] masik csapat\n");
+            } else if (!canMove) {
+                printf("[amazon katt ] nem tud mozogni\n");
+            }
         }
     }
 
@@ -308,16 +310,3 @@ int main(){
     
     return 0;
 }
-
-/*     gout.open(400,400);
-     gout << color(255, 200, 170) << move_to(20,20) << box(20,20) << refresh; 
-    event ev;
-    int x = 0;
-    while (gin>> ev)
-    {
-        if(ev.pos_x > 20 && ev.pos_x < 40 && ev.pos_y > 20 && ev.pos_y < 40){
-            x += 1;
-            cout << "benne van" << x <<'\n';
-        }
-    }
-     */

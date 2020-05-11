@@ -25,14 +25,13 @@ void Field::Draw(){
     }
     else {
         r = g = b = 0;
-        tint_factor = 0.85f;
+        tint_factor = 0.9f;
     }
     r = r + (255 - r) * tint_factor*(!isBlack);
     g = g + (255 - g) * tint_factor*(!isBlack);
     b = b + (255 - b) * tint_factor*(!isBlack);
 
     gout << color(r, g, b) << move_to(x, y)<< box(wid, hei);    
-
 }
 
 void Field::Handle(event ev){
