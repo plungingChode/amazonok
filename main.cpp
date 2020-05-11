@@ -4,7 +4,6 @@
 #include "SetNum.hpp"
 #include "Button.hpp"
 #include "Amazon.hpp"
-#include "Arrow.hpp"
 #include "Field.hpp"
 
 #include <string>
@@ -18,27 +17,30 @@ using namespace genv;
 
 class Amazons : public Application{
 protected:
+    // statuszkodok
     enum status_t
     {
-        BEGIN,
+        BEGIN = 0,
         SELECT,
         MOVE,
         SHOOT,
         END
     };
 
-    enum player_t
+    // mezok tipusai
+    enum cell_t
     {
+        HIGHLIGHT = -1,
         EMPTY = 0,
         P1 = 1,
         P2 = 2,
-        ARROW = 3
+        ARROW = 3,
     };
 
     SetNum *setBoardSize, *setAmazonNum;
     Button *playButton, *vsBotButton;
 
-    vector<vector<int>> hatter = 
+    vector<vector<int>> board = 
     {{1, 0, 0, 0, 0, 0},
      {0, 0, 0, 0, 0, 0},
      {0, 0, 0, 0, 0, 0},
@@ -49,7 +51,6 @@ protected:
     vector<vector<Field *>> fields;
     vector<Amazon *> p1Amazons, p2Amazons;
     int boardSize = 0;
-    int maxAmazons = 0;
     bool setup = true;
     int fieldSize;
 
@@ -58,49 +59,56 @@ protected:
     bool currentTeam = true;
 
 public:
-    Amazons(int Wid, int Hei): Application(Wid, Hei){}
+    Amazons(int Wid, int Hei): Application(Wid, Hei) { }
 
-    bool inBounds(int x, int y)
+    // Adott pont a tablan van-e?
+    bool IsInBounds(int x, int y)
     {
         return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
     }
 
-    bool isFree(int x, int y)
+    // Adott pont ures-e? (erteke 0)
+    bool IsFree(int x, int y)
     {
-        return hatter[x][y] == 0;
+        return board[x][y] == EMPTY;
     }
 
-    bool isHighlight(int x, int y)
+    // Adott pont ki van-e jelolve? (erteke -1)
+    bool IsHighlight(int x, int y)
     {
-        return hatter[x][y] == -1;
+        return board[x][y] == HIGHLIGHT;
     }
 
-    void highlight(int x, int y)
+    // Adott pont es hozza tartozo mezo kijelolese.
+    void Highlight(int x, int y)
     {
-        hatter[x][y] = -1;
-        fields[x][y]->setHighlight(true);
+        board[x][y] = HIGHLIGHT;
+        fields[x][y]->SetHighlight(true);
     }
 
-    void clearHighlight()
+    // Minden kijeloles torlese.
+    void ClearHighlight()
     {
         for (int x = 0; x < boardSize; x++) {
             for (int y = 0; y < boardSize; y++) {
-                if (isHighlight(x, y)) {
-                    hatter[x][y] = 0;
+                if (IsHighlight(x, y)) {
+                    board[x][y] = EMPTY;
                 }
-                fields[x][y]->setHighlight(false);
+                fields[x][y]->SetHighlight(false);
             }
         }
     }
 
-    bool checkDirection(int x, int y, int dx, int dy, bool doHighlight)
+    // Adott iranyban megnezi, van-e elerheto ures mezo. 
+    // Ha 'doHighlight', akkor az elerheto mezoket kijeloli.
+    bool CheckDirection(int x, int y, int dx, int dy, bool doHighlight)
     {
         bool hasFree = false;
         x += dx;
         y += dy;
-        while(inBounds(x, y) && isFree(x, y))
+        while(IsInBounds(x, y) && IsFree(x, y))
         {
-            if (doHighlight) highlight(x, y);
+            if (doHighlight) Highlight(x, y);
             hasFree = true;
             x += dx;
             y += dy;
@@ -108,48 +116,49 @@ public:
         return hasFree;
     }
 
-    bool checkFree(int x, int y, bool doHighlight = true)
+    // Megnezi mind a 8 iranyban, hogy van-e elerheto ures mezo.
+    // Ha 'doHighlight', akkor az elerheto mezoket kijeloli.
+    bool CheckFree(int x, int y, bool doHighlight = true)
     {
         bool good = false;
-        good |= checkDirection(x, y,  1,  0, doHighlight);
-        good |= checkDirection(x, y, -1,  0, doHighlight);
-        good |= checkDirection(x, y,  0,  1, doHighlight);
-        good |= checkDirection(x, y,  0, -1, doHighlight);
-        good |= checkDirection(x, y,  1,  1, doHighlight);
-        good |= checkDirection(x, y,  1, -1, doHighlight);
-        good |= checkDirection(x, y, -1,  1, doHighlight);
-        good |= checkDirection(x, y, -1, -1, doHighlight);
+        good |= CheckDirection(x, y,  1,  0, doHighlight);
+        good |= CheckDirection(x, y, -1,  0, doHighlight);
+        good |= CheckDirection(x, y,  0,  1, doHighlight);
+        good |= CheckDirection(x, y,  0, -1, doHighlight);
+        good |= CheckDirection(x, y,  1,  1, doHighlight);
+        good |= CheckDirection(x, y,  1, -1, doHighlight);
+        good |= CheckDirection(x, y, -1,  1, doHighlight);
+        good |= CheckDirection(x, y, -1, -1, doHighlight);
         return good;
     }
 
-    bool checkCanMove(const vector<Amazon*> &v)
+    // Megnezi, tud-e mozogni az egyik jatekos barmely amazonja.
+    bool CheckCanMove(const vector<Amazon*> &v)
     {
-        for (Amazon *a : v)
-        {
-            if (!checkFree(a->coordX(), a->coordY(), false))
-            {
+        for (Amazon *a : v) {
+            if (!CheckFree(a->CoordX(), a->CoordY(), false)) {
                 return false;
             }
         }
         return true;
     }
 
-    void amazon_onClick(Amazon *a)
-    {        
-        int x = a->coordX();
-        int y = a->coordY();
+    // Amazon hivja meg, ha ra kattintottak
+    void Amazon_OnClick(Amazon *a)
+    {
+        int x = a->CoordX();
+        int y = a->CoordY();
         printf("[amazon katt ] %d, %d\n", x, y);
 
         if (status == SELECT) {
-            bool sameTeam = a->team() == currentTeam;
-            bool canMove = sameTeam && checkFree(x, y);
+            bool sameTeam = a->Team() == currentTeam;   // csak sajat babu
+            bool canMove = sameTeam && CheckFree(x, y); // nezzuk meg, merre mozoghat
             if (canMove) {
-                a->setSelected(true);
-
+                a->SetSelected(true);
                 activeAmazon = a;
-                printf("[amazon kival] %d, %d\n", x, y);
+                status = MOVE;
 
-                status = MOVE; // kijeloltek vkit --> mozoghat
+                printf("[amazon kival] %d, %d\n", x, y);
                 printf("[status valt ] SEL >> MOV\n");
             } else if (!sameTeam) {
                 printf("[amazon katt ] masik csapat\n");
@@ -159,83 +168,96 @@ public:
         }
     }
 
-    void field_onClick(int x, int y)
+    // Mezo hivja meg, ha rakattintottak
+    void Field_OnClick(int x, int y)
     {
         printf("[mezore katt ] %d, %d\n", x, y);
-        if (status == SHOOT && isHighlight(x, y)) // lojon, ha elerheto a mezo
+        if (status == SHOOT && IsHighlight(x, y)) // csak a megjelolt mezokre lohet
         {
-            hatter[x][y] = ARROW;
+            board[x][y] = ARROW;
+            fields[x][y]->SetArrow(true);
+            
+            // loves utan nincs kivalasztott -> toroljuk
+            activeAmazon->SetSelected(false);
+            activeAmazon = nullptr;
+
             status = SELECT;
             currentTeam = !currentTeam;
-            fields[x][y]->setArrow(true);
-            activeAmazon->setSelected(false);
-            activeAmazon = nullptr;
-            clearHighlight();
 
-            // itt megnezni, h nyert-e valaki
-            if (!checkCanMove(p1Amazons)) {
+            // totroljuk a megjelolt mezoket
+            ClearHighlight();
+
+            // nezzuk meg, nyert-e valaki
+            if (!CheckCanMove(p1Amazons)) {
                 status = END;
                 printf("[status valt ] SHT >> END\n");
                 printf("[status      ] P2 win\n");
-            } else if (!checkCanMove(p2Amazons)) {
+            } else if (!CheckCanMove(p2Amazons)) {
                 status = END;
                 printf("[status valt ] SHT >> END\n");
                 printf("[status      ] P1 win\n");
             }
         }
 
-        if (status == MOVE && isHighlight(x, y)) {
-                int regi_x = activeAmazon->coordX();
-                int regi_y = activeAmazon->coordY();
+        if (status == MOVE && IsHighlight(x, y)) { // csak a megjelolt mezokre lephet
+                int regi_x = activeAmazon->CoordX();
+                int regi_y = activeAmazon->CoordY();
 
-                hatter[regi_x][regi_y] = 0;
-                hatter[x][y] = 2 - currentTeam; 
+                board[regi_x][regi_y] = EMPTY;
+                board[x][y] = currentTeam ? P1 : P2; // player 1 = 'true', player 2 = 'false'
                 activeAmazon->MoveTo(x*fieldSize+10, y*fieldSize+10, x, y);
+
                 printf("[amazon mozog] (%d, %d) >> (%d, %d)\n", regi_x, regi_y, x, y);
 
-                clearHighlight();
-                if (checkFree(x, y)) {
-                    status = SHOOT; // most lehessen loni
+                ClearHighlight();
+                if (CheckFree(x, y)) { // ha van hova loni, lojon (kotelezo loni?)
+                    status = SHOOT;
                     printf("[status valt ] MOV >> SHT\n");
                 }
-                else {
-                    status = SELECT;
-                    printf("[status valt ] MOV >> SEL\n");
-                    
-                    activeAmazon->setSelected(false);
+                else { // ha nincs, akkor a masik jatekos jon (van ilyen?)
+                    activeAmazon->SetSelected(false);
                     activeAmazon = nullptr;
-                    printf("[amazon kival] torolve\n");
 
+                    status = SELECT;
                     currentTeam = !currentTeam;
+
+                    printf("[status valt ] MOV >> SEL\n");
+                    printf("[amazon kival] torolve\n");
                 }
         }
     }
 
-    void Menu(){
+    void Menu() {
         setBoardSize = new SetNum(this, 250, 300, 100, 30, 6, 12);
         setAmazonNum = new SetNum(this, 250, 340, 100, 30, 1, 4);
         function<void()> play = [=](){
             widgets.clear();
             status = SELECT;
-            boardSize = setBoardSize->GetValue();
+            // v ~~~~~~~ ezt majd mashogy
+            // boardSize = setBoardSize->GetValue(); 
             Setup();
         };
         playButton = new Button(this, 250, 150, 100, 30, "Play", play);
         /* vsBotButton = new Button(this, 250, 190, 100, 30, "VS Bot"); */
+        EventLoop();
     }
 
 
-    void Setup(){
-        double calculate = wid/boardSize;
-        fieldSize = floor(calculate);
+    void Setup() {
+        // a 'board' valtoztatsaval modosithato
+        boardSize = board.size();
+        fieldSize = wid/boardSize; // sztem ide nem kell a floor, ugy tudom
+                                   // az int osztas alapbol lefele kerekit
 
+        // 'Field'eket matrixban, h konnyeb legyen keresni
         fields = vector<vector<Field *>>(boardSize, vector<Field*>(boardSize));
         std::function<void(int, int)> fieldCallback = [=](int x, int y)
         {
-            field_onClick(x, y);
+            Field_OnClick(x, y);
         };
-        for(int x = 0;x<boardSize;x++){
-            for(int y = 0;y<boardSize;y++){
+        for(int x = 0;x<boardSize;x++) {
+            for(int y = 0;y<boardSize;y++) {
+                // erdemes kulon felvenni ezeket, igy kicsit atlathatobb
                 int pos_x = x*fieldSize;
                 int pos_y = y*fieldSize;
                 int size = fieldSize;
@@ -248,14 +270,14 @@ public:
 
         std::function<void(Amazon*)> amazonCallback = [=](Amazon* a)
         {
-            amazon_onClick(a);
+            Amazon_OnClick(a);
         };
-
         for (int x = 0; x < boardSize; x++) {
             for (int y = 0; y < boardSize; y++) {
-                if(hatter[x][y] != 0)
+                // az amazonok szamat es helyet a 'board'-rol olvassuk le
+                if(board[x][y] != 0)
                 {
-                    bool isPlayer1 = (hatter[x][y] == P1);
+                    bool isPlayer1 = (board[x][y] == P1);
                     int pos_x = x * fieldSize + 10;
                     int pos_y = y * fieldSize + 10;
                     int size = fieldSize - 20;
@@ -270,43 +292,13 @@ public:
             }
         }
     }
-
-    void Play(){}
-    
-    void GameOver(){}
-
-    void Action(string param){
-    }
-
-    void StateCheck(){
-        switch (status)
-        {
-        case 0:
-            Menu();
-            Amazons::EventLoop();
-            break;
-        case 1:
-            Setup();
-            Amazons::EventLoop();
-            break;
-        case 2:
-            /* Play(); */
-            Amazons::EventLoop();
-            break;
-        case 9:
-            GameOver();
-            Amazons::EventLoop();
-            break;    
-        default:
-            break;
-        }
-    }
+    void Action(string param) { }
 };
 
 
 int main(){
     Amazons Game(600, 600);
-    Game.StateCheck();
+    Game.Menu();
     
     return 0;
 }

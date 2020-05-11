@@ -5,24 +5,25 @@
 #include <functional>
 
 class Amazon : public Widget{
-    protected:
-        int cx, cy;
-        std::function<void(Amazon*)> onClick;
-        bool blueTeam, selected;
+protected:
+    int cx, cy;
+    std::function<void(Amazon*)> onClick;
+    bool blueTeam, selected;
 
-    public:
-        Amazon(Application * parent, int x, int y, int sx, int sy, int cx, int cy,
-              std::function<void(Amazon*)> ram_kattintottak, bool team);
+public:
+    Amazon(Application * parent, int x, int y, int sx, int sy, int cx, int cy,
+           std::function<void(Amazon*)> onClick, bool team);
 
-        int coordX() const { return cx; }
-        int coordY() const { return cy; }
-        bool team() const { return blueTeam; }
+    int CoordX() const { return cx; }
+    int CoordY() const { return cy; }
+    bool Team() const { return blueTeam; }
 
-        void setSelected(bool val) { selected = val; }
+    // Ha val == true, tesz kore egy keretet
+    void SetSelected(bool val) { selected = val; }
 
-        virtual void Draw();
-        virtual void Handle(genv::event ev);
-        virtual void MoveTo(int x, int y, int cx, int cy);
+    virtual void Draw();
+    virtual void Handle(genv::event ev);
+    virtual void MoveTo(int x, int y, int cx, int cy);
 };
 
 #endif
