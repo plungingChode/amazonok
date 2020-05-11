@@ -39,15 +39,15 @@ protected:
     Button *playButton, *vsBotButton;
 
     vector<vector<int>> hatter = 
-    {{1, 1, 0, 0, 0, 0},
-     {1, 0, 0, 0, 0, 0},
+    {{1, 0, 0, 0, 0, 0},
      {0, 0, 0, 0, 0, 0},
      {0, 0, 0, 0, 0, 0},
-     {0, 0, 0, 0, 0, 2},
-     {0, 0, 0, 0, 2, 2}};
+     {0, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 0},
+     {0, 0, 0, 0, 0, 2}};
 
     vector<vector<Field *>> fields;
-    vector<Amazon *> amazons;
+    vector<Amazon *> p1Amazons, p2Amazons;
     int boardSize = 0;
     int maxAmazons = 0;
     bool setup = true;
@@ -93,14 +93,14 @@ public:
         }
     }
 
-    bool checkDirection(int x, int y, int dx, int dy)
+    bool checkDirection(int x, int y, int dx, int dy, bool doHighlight)
     {
         bool hasFree = false;
         x += dx;
         y += dy;
         while(inBounds(x, y) && isFree(x, y))
         {
-            highlight(x, y);
+            if (doHighlight) highlight(x, y);
             hasFree = true;
             x += dx;
             y += dy;
@@ -108,18 +108,30 @@ public:
         return hasFree;
     }
 
-    bool checkFree(int x, int y)
+    bool checkFree(int x, int y, bool doHighlight = true)
     {
         bool good = false;
-        good |= checkDirection(x, y,  1,  0);
-        good |= checkDirection(x, y, -1,  0);
-        good |= checkDirection(x, y,  0,  1);
-        good |= checkDirection(x, y,  0, -1);
-        good |= checkDirection(x, y,  1,  1);
-        good |= checkDirection(x, y,  1, -1);
-        good |= checkDirection(x, y, -1,  1);
-        good |= checkDirection(x, y, -1, -1);
+        good |= checkDirection(x, y,  1,  0, doHighlight);
+        good |= checkDirection(x, y, -1,  0, doHighlight);
+        good |= checkDirection(x, y,  0,  1, doHighlight);
+        good |= checkDirection(x, y,  0, -1, doHighlight);
+        good |= checkDirection(x, y,  1,  1, doHighlight);
+        good |= checkDirection(x, y,  1, -1, doHighlight);
+        good |= checkDirection(x, y, -1,  1, doHighlight);
+        good |= checkDirection(x, y, -1, -1, doHighlight);
         return good;
+    }
+
+    bool checkCanMove(const vector<Amazon*> &v)
+    {
+        for (Amazon *a : v)
+        {
+            if (!checkFree(a->coordX(), a->coordY(), false))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     void amazon_onClick(Amazon *a)
@@ -159,6 +171,15 @@ public:
             clearHighlight();
 
             // itt megnezni, h nyert-e valaki
+            if (!checkCanMove(p1Amazons)) {
+                status = END;
+                printf("[status valt ] SHT >> END\n");
+                printf("[status      ] P2 win\n");
+            } else if (!checkCanMove(p2Amazons)) {
+                status = END;
+                printf("[status valt ] SHT >> END\n");
+                printf("[status      ] P1 win\n");
+            }
         }
 
         if (status == MOVE && isHighlight(x, y)) {
@@ -238,7 +259,11 @@ public:
                     int size = fieldSize - 20;
 
                     Amazon *a = new Amazon(this, pos_x, pos_y, size, size, x, y, amazonCallback, isPlayer1);
-                    amazons.push_back(a);
+                    if (isPlayer1) {
+                        p1Amazons.push_back(a);
+                    } else {
+                        p2Amazons.push_back(a);
+                    }
                 }
             }
         }
